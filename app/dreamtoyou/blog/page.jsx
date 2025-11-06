@@ -2,14 +2,14 @@
 import { useState, useEffect } from "react";
 
 export default function DreamToYouBlogPage() {
-  const [title, setTitle] = useState(""); // ✅ 제목 상태 추가
+  const [title, setTitle] = useState(""); // ✅ 제목 추가
   const [prompt, setPrompt] = useState("");
   const [category, setCategory] = useState("맛집");
   const [image, setImage] = useState(null);
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ 붙여넣기로 이미지 업로드 기능 추가
+  // ✅ 붙여넣기로 이미지 업로드
   useEffect(() => {
     const handlePaste = (e) => {
       const items = e.clipboardData.items;
@@ -26,16 +26,11 @@ export default function DreamToYouBlogPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim()) {
-      alert("제목을 입력해주세요!");
-      return;
-    }
-
     setLoading(true);
     setResult("");
 
     const formData = new FormData();
-    formData.append("title", title); // ✅ 제목 포함
+    formData.append("title", title);
     formData.append("prompt", prompt);
     formData.append("category", category);
     if (image) formData.append("image", image);
@@ -45,12 +40,10 @@ export default function DreamToYouBlogPage() {
         method: "POST",
         body: formData,
       });
-
       const data = await res.json();
-      if (data.result) setResult(data.result);
-      else setResult("❌ 오류 발생: " + data.error);
+      setResult(data.result || "⚠️ 오류 발생");
     } catch (err) {
-      setResult("⚠️ 서버 오류: " + err.message);
+      setResult("서버 오류: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -66,7 +59,6 @@ export default function DreamToYouBlogPage() {
         onSubmit={handleSubmit}
         className="flex flex-col gap-4 bg-white p-6 rounded-2xl shadow-md"
       >
-        {/* ✅ 제목 입력 */}
         <input
           type="text"
           placeholder="제목을 입력하세요"
