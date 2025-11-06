@@ -160,7 +160,7 @@ ${extractedText ? `\n\n[이미지에서 추출된 참고 텍스트]\n${extracted
 
     // ✅ GPT 호출
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini-2024-07-18",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
