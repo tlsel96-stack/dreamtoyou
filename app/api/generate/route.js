@@ -8,30 +8,30 @@ const openai = new OpenAI({
 export async function POST(req) {
   try {
     const formData = await req.formData();
+    console.log("📦 formData keys:", Array.from(formData.keys()));
+
     const prompt = formData.get("prompt");
     const category = formData.get("category");
     const image = formData.get("image");
 
     let extractedText = "";
 
-    // ✅ 이미지 OCR (있을 경우)
+    // ✅ 이미지 OCR 처리
     if (image) {
+      console.log("🖼️ 이미지 수신됨:", image.name, image.type, image.size, "bytes");
       const arrayBuffer = await image.arrayBuffer();
       const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
-      console.log("📤 OCR 시작 - 이미지 수신 완료");
-
       const ocrResponse = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
             content: `
 너는 OCR 전용 보조자야.
-이미지를 분석할 때 설명이나 요약을 하지 말고,
-보이는 글자만 정확하게 추출해.
-줄바꿈과 띄어쓰기도 그대로 유지해줘.
-출력은 순수한 텍스트만 포함해야 하며, 다른 말은 절대 하지 마.
+이미지에 보이는 텍스트만 정확하게 추출해.
+요약, 해석, 설명하지 말고 오직 글자만.
+줄바꿈도 그대로 유지해.
             `,
           },
           {
@@ -46,8 +46,17 @@ export async function POST(req) {
         ],
       });
 
-      extractedText = ocrResponse.choices[0].message.content || "";
-      console.log("🧾 OCR 인식 결과:", extractedText);
+      extractedText = ocrResponse.choices[0]?.message?.content?.trim() || "";
+      console.log("🧾 OCR 인식 결과:", extractedText || "(없음)");
+
+      if (!extractedText) {
+        return NextResponse.json(
+          { error: "⚠️ 이미지에서 텍스트를 인식하지 못했습니다. 이미지 내용을 다시 확인해주세요." },
+          { status: 400 }
+        );
+      }
+    } else {
+      console.log("⚠️ 이미지가 서버로 전달되지 않았습니다.");
     }
 
     // ✅ 카테고리별 systemPrompt
@@ -135,31 +144,18 @@ SEO기법을 사용해 상위노출이 가능하게끔 키워드를 적절하게
         `;
     }
 
-    // ✅ userPrompt (참고사항)
-    const userPrompt = `
-📌 아래 참고사항 내용만 사용해서 글을 작성하세요.
-📌 참고사항 외의 정보, 병원명, 지역명, 시술명, 키워드는 절대 추가하지 마세요.
-📌 제목이 있더라도 그 안의 단어를 본문에 엮지 마세요.
-
-[참고사항 시작]
-${prompt}
-${extractedText ? `\n\n[이미지에서 추출된 참고 텍스트]\n${extractedText}` : ""}
-[참고사항 끝]
-`;
-
-    // ✅ GPT 호출 (최종 글 생성)
+    // ✅ GPT 호출
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o", // ✅ 여기도 통일
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature:
-        category === "병원글" ? 0.2 : category === "정보성" ? 0.5 : 0.8,
+      temperature: 0.4,
       max_tokens: 2000,
     });
 
-    const result = completion.choices[0].message.content;
+    const result = completion.choices[0]?.message?.content || "";
     return NextResponse.json({ result });
   } catch (error) {
     console.error("🔥 오류 발생:", error.response?.data || error);
@@ -172,3 +168,4 @@ ${extractedText ? `\n\n[이미지에서 추출된 참고 텍스트]\n${extracted
     );
   }
 }
+
