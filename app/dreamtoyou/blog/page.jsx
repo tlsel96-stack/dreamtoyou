@@ -2,14 +2,15 @@
 import { useState, useEffect } from "react";
 
 export default function DreamToYouBlogPage() {
-  const [title, setTitle] = useState(""); // ✅ 제목 추가
+  const [title, setTitle] = useState("");
   const [prompt, setPrompt] = useState("");
   const [category, setCategory] = useState("맛집");
   const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ 붙여넣기로 이미지 업로드
+  // ✅ 캡처 이미지 붙여넣기 기능
   useEffect(() => {
     const handlePaste = (e) => {
       const items = e.clipboardData.items;
@@ -17,6 +18,7 @@ export default function DreamToYouBlogPage() {
         if (item.type.startsWith("image/")) {
           const file = item.getAsFile();
           setImage(file);
+          setPreview(URL.createObjectURL(file));
         }
       }
     };
@@ -26,6 +28,11 @@ export default function DreamToYouBlogPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!title.trim()) {
+      alert("제목을 입력해주세요!");
+      return;
+    }
+
     setLoading(true);
     setResult("");
 
@@ -40,10 +47,12 @@ export default function DreamToYouBlogPage() {
         method: "POST",
         body: formData,
       });
+
       const data = await res.json();
-      setResult(data.result || "⚠️ 오류 발생");
+      if (data.result) setResult(data.result);
+      else setResult("❌ 오류 발생: " + data.error);
     } catch (err) {
-      setResult("서버 오류: " + err.message);
+      setResult("⚠️ 서버 오류: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -85,12 +94,18 @@ export default function DreamToYouBlogPage() {
           <option value="병원글">병원글</option>
         </select>
 
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setImage(e.target.files[0])}
-          className="border border-gray-300 rounded-lg p-2"
-        />
+        {/* ✅ 이미지 붙여넣기 안내 */}
+        <div className="border border-dashed border-gray-400 rounded-lg p-6 text-center text-gray-600">
+          {preview ? (
+            <img
+              src={preview}
+              alt="붙여넣은 이미지"
+              className="max-h-64 mx-auto rounded-lg shadow-md"
+            />
+          ) : (
+            <p>📸 이미지를 붙여넣으면 자동으로 업로드됩니다 (Ctrl + V)</p>
+          )}
+        </div>
 
         <button
           type="submit"
