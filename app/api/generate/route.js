@@ -16,34 +16,37 @@ export async function POST(req) {
     const category = formData.get("category") || "";
     const image = formData.get("image");
 
-    let extractedText = "";
+    let extractedText = ""; // ✅ 선언
 
     // ✅ OCR (이미지 텍스트 인식)
- if (image) {
-  const buffer = Buffer.from(await image.arrayBuffer());
-  const base64Image = buffer.toString("base64");
+    if (image) {
+      const buffer = Buffer.from(await image.arrayBuffer());
+      const base64Image = buffer.toString("base64");
 
-  const ocrResponse = await openai.chat.completions.create({
-    model: "gpt-4o-mini", // OCR 지원 모델
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "이 이미지에서 글자 내용을 한국어로 인식해줘." },
+      const ocrResponse = await openai.chat.completions.create({
+        model: "gpt-4o-mini", // OCR 지원 모델
+        messages: [
           {
-            type: "image_url",
-            image_url: {
-              url: `data:image/png;base64,${base64Image}`, // ✅ 문자열 → 객체로 감싸기
-            },
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "이 이미지에서 글자 내용을 한국어로 인식해줘.",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/png;base64,${base64Image}`, // ✅ 문자열 → 객체로 감싸기
+                },
+              },
+            ],
           },
         ],
-      },
-    ],
-  });
+      });
 
-  const ocrText = ocrResponse.choices[0].message.content.trim();
-  referenceText += `\n\n(이미지 인식 결과)\n${ocrText}`;
-}
+      const ocrText = ocrResponse.choices[0].message.content.trim();
+      extractedText += `\n\n(이미지 인식 결과)\n${ocrText}`; // ✅ 올바른 변수명으로 변경
+    }
 
     // ✅ GPT로 보낼 최종 프롬프트 구성
     const finalPrompt = `
@@ -58,7 +61,7 @@ ${extractedText}
 위의 정보를 참고해 자연스럽고 흥미로운 블로그 글을 작성해주세요.
 `;
 
-    // ✅ GPT 호출 (오류 없이 작동하는 형식)
+    // ✅ GPT 호출 (정상 작동)
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
