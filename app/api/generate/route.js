@@ -17,45 +17,46 @@ export async function POST(req) {
     let extractedText = "";
 
     // ✅ 이미지 OCR 처리
-  if (image) {
-  console.log("🖼️ 이미지 수신됨:", image.name, image.type, image.size, "bytes");
-  const arrayBuffer = await image.arrayBuffer();
-  const base64Image = Buffer.from(arrayBuffer).toString("base64");
+    if (image) {
+      console.log("🖼️ 이미지 수신됨:", image.name, image.type, image.size, "bytes");
+      const arrayBuffer = await image.arrayBuffer();
+      const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
-  const ocrResponse = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: `
+      const ocrResponse = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `
 너는 OCR 보조자야.
 이미지 안의 텍스트를 정확히 추출해.
-요약하지 말고, 보이는 글자 그대로 출력해.
-줄바꿈과 띄어쓰기를 유지해.
+요약하거나 해석하지 말고 보이는 글자 그대로 출력해.
+줄바꿈과 띄어쓰기를 그대로 유지해.
 다른 설명은 절대 하지 마.
-        `,
-      },
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "이 이미지 안의 모든 글자를 그대로 추출해줘." }, // ✅ 이 한 줄이 핵심!
-          { type: "image_url", image_url: `data:image/png;base64,${base64Image}` },
+            `,
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "이 이미지 안의 모든 글자를 그대로 추출해줘." }, // ✅ 핵심
+              { type: "image_url", image_url: `data:image/png;base64,${base64Image}` },
+            ],
+          },
         ],
-      },
-    ],
-  });
+      });
 
-  extractedText = ocrResponse.choices[0]?.message?.content?.trim() || "";
-  console.log("🧾 OCR 인식 결과:", extractedText || "(없음)");
+      extractedText = ocrResponse.choices[0]?.message?.content?.trim() || "";
+      console.log("🧾 OCR 인식 결과:", extractedText || "(없음)");
 
-  if (!extractedText) {
-    return NextResponse.json(
-      { error: "⚠️ 이미지에서 텍스트를 인식하지 못했습니다. 텍스트가 있는 이미지인지 확인하세요." },
-      { status: 400 }
-    );
-  }
-}
-
+      if (!extractedText) {
+        return NextResponse.json(
+          { error: "⚠️ 이미지에서 텍스트를 인식하지 못했습니다. 이미지 내용을 다시 확인해주세요." },
+          { status: 400 }
+        );
+      }
+    } else {
+      console.log("⚠️ 이미지가 서버로 전달되지 않았습니다.");
+    }
 
     // ✅ 카테고리별 systemPrompt
     let systemPrompt = "";
@@ -142,7 +143,7 @@ SEO기법을 사용해 상위노출이 가능하게끔 키워드를 적절하게
         `;
     }
 
-    // ✅ GPT 호출
+  // ✅ GPT 호출
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
