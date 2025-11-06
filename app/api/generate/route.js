@@ -7,17 +7,19 @@ const openai = new OpenAI({
 
 export async function POST(req) {
   try {
-    // ✅ JSON이 아니라 formData로 받기 (이미지도 함께 받기 위함)
+    // ✅ JSON 대신 formData로 받기 (이미지 포함)
     const formData = await req.formData();
     const prompt = formData.get("prompt"); // 참고사항 (텍스트)
     const category = formData.get("category"); // 카테고리 (맛집 / 병원글 등)
-    const image = formData.get("image"); // 참고사항 이미지 파일
+    const image = formData.get("image"); // 이미지 파일
 
     let extractedText = "";
 
-    // ✅ 이미지 OCR (이미지가 있으면 GPT가 텍스트로 읽음)
+    // ✅ 이미지 OCR (이미지가 있으면 GPT가 읽음)
     if (image) {
       const arrayBuffer = await image.arrayBuffer();
+
+      // ✅ Buffer 변환 (Node 환경)
       const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
       const ocrResponse = await openai.chat.completions.create({
@@ -30,7 +32,10 @@ export async function POST(req) {
           {
             role: "user",
             content: [
-              { type: "image_url", image_url: `data:image/png;base64,${base64Image}` },
+              {
+                type: "image_url",
+                image_url: `data:image/png;base64,${base64Image}`,
+              },
             ],
           },
         ],
@@ -39,7 +44,7 @@ export async function POST(req) {
       extractedText = ocrResponse.choices[0].message.content || "";
     }
 
-    // ✅ 카테고리별 systemPrompt 유지
+    // ✅ 카테고리별 systemPrompt
     let systemPrompt = "";
 
     switch (category) {
@@ -99,7 +104,7 @@ SEO 최적화된 키워드를 적절히 배치하고, 부자연스러운 인공�
 확실 → 명확
 정확 → 정밀
 안전, 안정성 → 검증된, 안보, 안심
-만족 → 믿음직한, 자족 
+만족 → 믿음직한, 자족
 만족감→충족감
 보장 → 보증
 부작용 → 개개인에 따른, 후유증, 해악
@@ -125,7 +130,7 @@ SEO 최적화된 키워드를 적절히 배치하고, 부자연스러운 인공�
         systemPrompt = `너는 SEO 최적화된 블로그 작가야. 자연스럽고 독창적인 문체로 작성해줘.`;
     }
 
-    // ✅ 참고사항 병합 (텍스트 + OCR 이미지 내용)
+    // ✅ 참고사항 병합 (텍스트 + OCR 내용)
     const fullPrompt = `
 ${systemPrompt}
 
@@ -141,21 +146,21 @@ ${extractedText ? `\n\n[이미지에서 추출된 참고 텍스트]\n${extracted
 [참고사항 끝]
 `;
 
-    // ✅ OpenAI 호출
+    // ✅ 최종 GPT 요청
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini-2024-07-18",
       messages: [
         { role: "system", content: fullPrompt },
         { role: "user", content: "위 참고사항을 기반으로 최종 블로그 본문을 작성하세요." },
       ],
-      temperature: category === "병원글" ? 0.1 : 0.8,
+      temperature: category === "병원글" ? 0.1 : category === "정보성" ? 0.4 : 0.8,
       max_tokens: 2000,
     });
 
     const result = completion.choices[0].message.content;
     return NextResponse.json({ result });
   } catch (error) {
-    console.error("🔥 오류 발생:", error);
+    console.error("🔥 오류 발생:", error.response?.data || error);
     return NextResponse.json(
       { error: "글 생성 중 오류가 발생했습니다.", details: error.message },
       { status: 500 }
