@@ -16,27 +16,28 @@ export async function POST(req) {
     const category = formData.get("category") || "";
     const image = formData.get("image");
 
-    let extractedText = ""; // ✅ 선언
+    let extractedText = "";
 
-    // ✅ OCR (이미지 텍스트 인식)
+    // ✅ OCR (이미지에서 텍스트 추출)
     if (image) {
       const buffer = Buffer.from(await image.arrayBuffer());
       const base64Image = buffer.toString("base64");
 
+      // OpenAI Vision OCR
       const ocrResponse = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // OCR 지원 모델
+        model: "gpt-4o-mini", // 이미지 인식 가능 모델
         messages: [
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "이 이미지에서 글자 내용을 한국어로 인식해줘.",
+                text: "이 이미지 안의 글자를 한국어로 인식해줘.",
               },
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:image/png;base64,${base64Image}`, // ✅ 문자열 → 객체로 감싸기
+                  url: `data:image/png;base64,${base64Image}`,
                 },
               },
             ],
@@ -44,11 +45,11 @@ export async function POST(req) {
         ],
       });
 
-      const ocrText = ocrResponse.choices[0].message.content.trim();
-      extractedText += `\n\n(이미지 인식 결과)\n${ocrText}`; // ✅ 올바른 변수명으로 변경
+      const ocrText = ocrResponse.choices[0]?.message?.content?.trim() || "";
+      extractedText += `\n\n(이미지 인식 결과)\n${ocrText}`;
     }
 
-    // ✅ GPT로 보낼 최종 프롬프트 구성
+    // ✅ GPT에게 보낼 최종 프롬프트 구성
     const finalPrompt = `
 [블로그 글 작성 요청]
 카테고리: ${category}
@@ -58,10 +59,10 @@ export async function POST(req) {
 아래는 이미지에서 추출된 텍스트입니다:
 ${extractedText}
 
-위의 정보를 참고해 자연스럽고 흥미로운 블로그 글을 작성해주세요.
+위의 정보를 참고하여 자연스럽고 흥미로운 블로그 글을 작성해주세요.
 `;
 
-    // ✅ GPT 호출 (정상 작동)
+    // ✅ 블로그 글 생성
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -74,6 +75,7 @@ ${extractedText}
     });
 
     const result = completion.choices[0]?.message?.content || "결과 없음";
+
     return NextResponse.json({ result });
   } catch (error) {
     console.error("❌ 서버 오류:", error);
