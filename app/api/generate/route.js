@@ -19,13 +19,31 @@ export async function POST(req) {
     let extractedText = "";
 
     // ✅ OCR (이미지 텍스트 인식)
-    if (image) {
-      const bytes = await image.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const { data } = await Tesseract.recognize(buffer, "kor+eng");
-      extractedText = data.text.trim();
-      console.log("🧾 OCR 결과:", extractedText);
-    }
+ if (image) {
+  const buffer = Buffer.from(await image.arrayBuffer());
+  const base64Image = buffer.toString("base64");
+
+  const ocrResponse = await openai.chat.completions.create({
+    model: "gpt-4o-mini", // OCR 지원 모델
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "이 이미지에서 글자 내용을 한국어로 인식해줘." },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/png;base64,${base64Image}`, // ✅ 문자열 → 객체로 감싸기
+            },
+          },
+        ],
+      },
+    ],
+  });
+
+  const ocrText = ocrResponse.choices[0].message.content.trim();
+  referenceText += `\n\n(이미지 인식 결과)\n${ocrText}`;
+}
 
     // ✅ GPT로 보낼 최종 프롬프트 구성
     const finalPrompt = `
