@@ -20,24 +20,31 @@ export async function POST(req) {
       const arrayBuffer = await image.arrayBuffer();
       const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
-      const ocrResponse = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "너는 OCR 보조자야. 이미지를 보고 안의 글자를 최대한 정확히 추출해줘.",
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: `data:image/png;base64,${base64Image}`,
-              },
-            ],
-          },
-        ],
-      });
+     const ocrResponse = await openai.chat.completions.create({
+  model: "gpt-4o",
+  messages: [
+    {
+      role: "system",
+      content: `
+너는 OCR 전용 보조자야.
+이미지를 분석할 때 설명이나 요약을 하지 말고,
+보이는 글자만 정확하게 추출해.
+줄바꿈과 띄어쓰기도 그대로 유지해줘.
+출력은 순수한 텍스트만 포함해야 하며, 다른 말은 절대 하지 마.
+      `,
+    },
+    {
+      role: "user",
+      content: [
+        {
+          type: "image_url",
+          image_url: `data:image/png;base64,${base64Image}`,
+        },
+      ],
+    },
+  ],
+});
+
 
       extractedText = ocrResponse.choices[0].message.content || "";
     }
