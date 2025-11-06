@@ -1,5 +1,6 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
+import Tesseract from "tesseract.js";
 
 export const runtime = "nodejs";
 
@@ -10,54 +11,51 @@ const openai = new OpenAI({
 export async function POST(req) {
   try {
     const formData = await req.formData();
-    const title = formData.get("title") || "제목 없음";
+    const title = formData.get("title") || "";
     const prompt = formData.get("prompt") || "";
-    const category = formData.get("category") || "기타";
+    const category = formData.get("category") || "";
     const image = formData.get("image");
 
-    let referenceText = prompt;
+    let extractedText = "";
 
-    // ✅ OCR: 이미지 → 텍스트
+    // ✅ 이미지가 있으면 OCR 수행
     if (image) {
-      const buffer = Buffer.from(await image.arrayBuffer());
-      const base64 = buffer.toString("base64");
-
-      const ocr = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "이 이미지 속 글자를 한국어로 정확하게 읽어줘." },
-              { type: "image_url", image_url: `data:image/png;base64,${base64}` },
-            ],
-          },
-        ],
-      });
-
-      const ocrText = ocr.choices?.[0]?.message?.content?.trim() || "";
-      if (ocrText) referenceText += `\n\n[이미지 인식 결과]\n${ocrText}`;
+      const bytes = await image.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const { data } = await Tesseract.recognize(buffer, "kor+eng");
+      extractedText = data.text.trim();
     }
 
-    // ✅ 블로그 글 생성
-    const response = await openai.chat.completions.create({
+    // ✅ GPT 프롬프트 구성
+    const finalPrompt = `
+[블로그 글 작성 요청]
+카테고리: ${category}
+제목: ${title}
+참고사항: ${prompt}
+
+아래는 이미지에서 추출된 텍스트입니다:
+${extractedText}
+
+위의 정보를 모두 종합해 자연스럽고 흥미로운 블로그 원고를 작성해주세요.
+`;
+
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
-          role: "system",
-          content: `너는 ${category} 관련 블로그 글을 잘 쓰는 작가야.`,
-        },
-        {
           role: "user",
-          content: `제목: ${title}\n\n참고내용:\n${referenceText}\n\n이 내용을 기반으로 자연스럽고 완성도 높은 블로그 글을 작성해줘.`,
+          content: [{ type: "text", text: finalPrompt }],
         },
       ],
     });
 
-    const result = response.choices?.[0]?.message?.content || "결과 없음";
+    const result = completion.choices[0].message.content;
     return NextResponse.json({ result });
-  } catch (err) {
-    console.error("🚨 서버 오류:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    console.error("❌ 오류:", error);
+    return NextResponse.json(
+      { error: error.message || "서버 오류" },
+      { status: 500 }
+    );
   }
 }
