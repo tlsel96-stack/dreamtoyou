@@ -7,9 +7,39 @@ const openai = new OpenAI({
 
 export async function POST(req) {
   try {
-    const { prompt, category } = await req.json(); // 프롬프트 + 카테고리 받기
+    // ✅ JSON이 아니라 formData로 받기 (이미지도 함께 받기 위함)
+    const formData = await req.formData();
+    const prompt = formData.get("prompt"); // 참고사항 (텍스트)
+    const category = formData.get("category"); // 카테고리 (맛집 / 병원글 등)
+    const image = formData.get("image"); // 참고사항 이미지 파일
 
-    // ✅ 카테고리별 시스템 프롬프트
+    let extractedText = "";
+
+    // ✅ 이미지 OCR (이미지가 있으면 GPT가 텍스트로 읽음)
+    if (image) {
+      const arrayBuffer = await image.arrayBuffer();
+      const base64Image = Buffer.from(arrayBuffer).toString("base64");
+
+      const ocrResponse = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "너는 OCR 보조자야. 이미지를 보고 안의 글자를 최대한 정확히 추출해줘.",
+          },
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: `data:image/png;base64,${base64Image}` },
+            ],
+          },
+        ],
+      });
+
+      extractedText = ocrResponse.choices[0].message.content || "";
+    }
+
+    // ✅ 카테고리별 systemPrompt 유지
     let systemPrompt = "";
 
     switch (category) {
@@ -95,8 +125,7 @@ SEO 최적화된 키워드를 적절히 배치하고, 부자연스러운 인공�
         systemPrompt = `너는 SEO 최적화된 블로그 작가야. 자연스럽고 독창적인 문체로 작성해줘.`;
     }
 
-    // ✅ 참고사항 병합 (핵심!)
-    // 참고사항을 단순히 user 입력이 아닌 "system 규칙"처럼 강제 적용
+    // ✅ 참고사항 병합 (텍스트 + OCR 이미지 내용)
     const fullPrompt = `
 ${systemPrompt}
 
@@ -108,6 +137,7 @@ ${systemPrompt}
 
 [참고사항 시작]
 ${prompt}
+${extractedText ? `\n\n[이미지에서 추출된 참고 텍스트]\n${extractedText}` : ""}
 [참고사항 끝]
 `;
 
