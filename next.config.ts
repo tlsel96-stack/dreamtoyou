@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    turbo: false, // ✅ Turbopack 끄기 (캐시 오류 방지)
-  },
+  reactStrictMode: true, // ✅ 안전하게 React Strict Mode만 설정
 };
 
 export default nextConfig;
