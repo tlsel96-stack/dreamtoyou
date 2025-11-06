@@ -8,54 +8,55 @@ const openai = new OpenAI({
 export async function POST(req) {
   try {
     const formData = await req.formData();
-    console.log("📦 formData keys:", Array.from(formData.keys()));
-
-    const prompt = formData.get("prompt");
-    const category = formData.get("category");
+    const prompt = formData.get("prompt") || "";
+    const category = formData.get("category") || "";
     const image = formData.get("image");
 
     let extractedText = "";
 
-    // ✅ 이미지 OCR 처리
+    // ✅ OCR (이미지 인식)
     if (image) {
-      console.log("🖼️ 이미지 수신됨:", image.name, image.type, image.size, "bytes");
       const arrayBuffer = await image.arrayBuffer();
-      const base64Image = Buffer.from(arrayBuffer).toString("base64");
+      const buffer = Buffer.from(arrayBuffer);
+      console.log(`🖼️ 이미지 수신됨: ${image.name || "no-name"} (${image.type}), ${image.size} bytes`);
 
-      const ocrResponse = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `
-너는 OCR 보조자야.
-이미지 안의 텍스트를 정확히 추출해.
-요약하거나 해석하지 말고 보이는 글자 그대로 출력해.
-줄바꿈과 띄어쓰기를 그대로 유지해.
-다른 설명은 절대 하지 마.
-            `,
-          },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "이 이미지 안의 모든 글자를 그대로 추출해줘." }, // ✅ 핵심
-              { type: "image_url", image_url: `data:image/png;base64,${base64Image}` },
-            ],
-          },
-        ],
-      });
+      try {
+        const ocrResponse = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content:
+                "너는 OCR 보조자야. 이미지 안의 모든 글자를 있는 그대로 추출해. 줄바꿈도 그대로. 설명하지 말고 순수 텍스트만 반환해.",
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "이미지 안의 텍스트를 정확히 추출해줘." },
+                { type: "input_image", image: buffer },
+              ],
+            },
+          ],
+        });
 
-      extractedText = ocrResponse.choices[0]?.message?.content?.trim() || "";
-      console.log("🧾 OCR 인식 결과:", extractedText || "(없음)");
+        extractedText = ocrResponse.choices?.[0]?.message?.content?.trim() || "";
+        console.log("🧾 OCR 인식 결과:", extractedText || "(없음)");
 
-      if (!extractedText) {
+        if (!extractedText) {
+          return NextResponse.json(
+            { error: "⚠️ 이미지에서 텍스트를 인식하지 못했습니다. (OCR 결과 없음)" },
+            { status: 400 }
+          );
+        }
+      } catch (ocrErr) {
+        console.error("❌ OCR 실패:", ocrErr);
         return NextResponse.json(
-          { error: "⚠️ 이미지에서 텍스트를 인식하지 못했습니다. 이미지 내용을 다시 확인해주세요." },
-          { status: 400 }
+          { error: "🚨 OCR 처리 중 오류 발생 (이미지 인식 실패)" },
+          { status: 500 }
         );
       }
     } else {
-      console.log("⚠️ 이미지가 서버로 전달되지 않았습니다.");
+      console.warn("⚠️ 이미지가 전달되지 않았습니다.");
     }
 
     // ✅ 카테고리별 systemPrompt
@@ -144,27 +145,33 @@ SEO기법을 사용해 상위노출이 가능하게끔 키워드를 적절하게
     }
 
   // ✅ GPT 호출
-    const completion = await openai.chat.completions.create({
+     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.4,
+      temperature: 0.7,
       max_tokens: 2000,
     });
 
-    const result = completion.choices[0]?.message?.content || "";
-    return NextResponse.json({ result });
+    const result = completion.choices?.[0]?.message?.content?.trim() || "";
+    if (!result) {
+      return NextResponse.json(
+        { error: "⚠️ GPT 결과가 비어 있습니다." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      result,
+      ocrStatus: extractedText ? "✅ 텍스트 인식 완료" : "⚠️ 이미지 인식 안 됨",
+    });
   } catch (error) {
-    console.error("🔥 오류 발생:", error.response?.data || error);
+    console.error("🔥 서버 전체 오류:", error);
     return NextResponse.json(
-      {
-        error: "글 생성 중 오류가 발생했습니다.",
-        details: error.message,
-      },
+      { error: "🚨 글 생성 중 오류 발생", details: error.message },
       { status: 500 }
     );
   }
 }
-
