@@ -27,13 +27,13 @@ export async function POST(req) {
             {
               role: "system",
               content:
-                "너는 OCR 보조자야. 이미지 안의 모든 글자를 있는 그대로 추출해. 줄바꿈도 그대로. 설명하지 말고 순수 텍스트만 반환해.",
+                "너는 OCR 보조자야. 이미지 안의 모든 글자를 그대로 추출해. 줄바꿈 포함. 설명하지 말고 순수 텍스트만 반환해.",
             },
             {
               role: "user",
               content: [
                 { type: "text", text: "이미지 안의 텍스트를 정확히 추출해줘." },
-                { type: "input_image", image: buffer },
+                { type: "image_url", image_url: `data:${image.type};base64,${buffer.toString("base64")}` },
               ],
             },
           ],
@@ -144,8 +144,15 @@ SEO기법을 사용해 상위노출이 가능하게끔 키워드를 적절하게
         `;
     }
 
-  // ✅ GPT 호출
-     const completion = await openai.chat.completions.create({
+   // ✅ 프롬프트 통합
+    const userPrompt = `
+${prompt}
+
+${extractedText ? `\n[이미지에서 추출된 참고 텍스트]\n${extractedText}` : ""}
+    `;
+
+    // ✅ GPT 호출
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
@@ -174,4 +181,5 @@ SEO기법을 사용해 상위노출이 가능하게끔 키워드를 적절하게
       { status: 500 }
     );
   }
+}
 }
