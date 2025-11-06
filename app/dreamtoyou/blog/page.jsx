@@ -1,19 +1,41 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function DreamToYouBlogPage() {
+  const [title, setTitle] = useState(""); // ✅ 제목 상태 추가
   const [prompt, setPrompt] = useState("");
   const [category, setCategory] = useState("맛집");
   const [image, setImage] = useState(null);
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ✅ 붙여넣기로 이미지 업로드 기능 추가
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData.items;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          setImage(file);
+        }
+      }
+    };
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!title.trim()) {
+      alert("제목을 입력해주세요!");
+      return;
+    }
+
     setLoading(true);
     setResult("");
 
     const formData = new FormData();
+    formData.append("title", title); // ✅ 제목 포함
     formData.append("prompt", prompt);
     formData.append("category", category);
     if (image) formData.append("image", image);
@@ -44,6 +66,15 @@ export default function DreamToYouBlogPage() {
         onSubmit={handleSubmit}
         className="flex flex-col gap-4 bg-white p-6 rounded-2xl shadow-md"
       >
+        {/* ✅ 제목 입력 */}
+        <input
+          type="text"
+          placeholder="제목을 입력하세요"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-300"
+        />
+
         <textarea
           placeholder="참고사항 (텍스트 입력)"
           value={prompt}
