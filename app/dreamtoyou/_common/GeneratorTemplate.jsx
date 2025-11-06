@@ -27,35 +27,45 @@ ${dynamicTitlePrompt}
   formData.append("prompt", prompt);
   formData.append("referenceText", referenceText);
   formData.append("title", title);
+  formData.append("category", selectedCategory || "정보성"); // ✅ 빠졌다면 추가
 
   if (images.length > 0) {
-    images.forEach((img, i) => {
-      // base64 → Blob 변환
-      const byteString = atob(img.split(",")[1]);
-      const mimeString = img.split(",")[0].split(":")[1].split(";")[0];
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let j = 0; j < byteString.length; j++) {
-        ia[j] = byteString.charCodeAt(j);
-      }
-      const blob = new Blob([ab], { type: mimeString });
-      formData.append("image", blob, `image-${i}.png`);
-    });
+    // ✅ 이미지 1장만 OCR용으로 전송
+    const img = images[0];
+    const byteString = atob(img.split(",")[1]);
+    const mimeString = img.split(",")[0].split(":")[1].split(";")[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let j = 0; j < byteString.length; j++) {
+      ia[j] = byteString.charCodeAt(j);
+    }
+    const blob = new Blob([ab], { type: mimeString });
+    formData.append("image", blob, "reference.png");
   }
 
+  // ✅ API 요청
   const res = await fetch("/api/generate", {
     method: "POST",
-    body: formData, // ✅ JSON 대신 FormData 전송
+    body: formData,
   });
 
   const data = await res.json();
 
-  if (!data.result) {
-    setResult("⚠️ 글 생성 실패 또는 오류 발생");
+  // ✅ OCR 실패 시 메시지 표시
+  if (data.error) {
+    alert(data.error); // ⚠️ 서버에서 "OCR 인식 실패"나 "글 생성 오류" 등 메시지 표시
     setLoading(false);
     return;
   }
 
+  // ✅ GPT 결과 없음
+  if (!data.result) {
+    alert("⚠️ 글 생성 실패 또는 오류 발생");
+    setLoading(false);
+    return;
+  }
+
+  // ✅ 결과 처리
   const content = data.result.trim();
   const [maybeTitle, ...rest] = content.split("\n");
   const cleanTitle =
