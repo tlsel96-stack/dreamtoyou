@@ -17,47 +17,45 @@ export async function POST(req) {
     let extractedText = "";
 
     // ✅ 이미지 OCR 처리
-    if (image) {
-      console.log("🖼️ 이미지 수신됨:", image.name, image.type, image.size, "bytes");
-      const arrayBuffer = await image.arrayBuffer();
-      const base64Image = Buffer.from(arrayBuffer).toString("base64");
+  if (image) {
+  console.log("🖼️ 이미지 수신됨:", image.name, image.type, image.size, "bytes");
+  const arrayBuffer = await image.arrayBuffer();
+  const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
-      const ocrResponse = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `
-너는 OCR 전용 보조자야.
-이미지에 보이는 텍스트만 정확하게 추출해.
-요약, 해석, 설명하지 말고 오직 글자만.
-줄바꿈도 그대로 유지해.
-            `,
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: `data:image/png;base64,${base64Image}`,
-              },
-            ],
-          },
+  const ocrResponse = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: `
+너는 OCR 보조자야.
+이미지 안의 텍스트를 정확히 추출해.
+요약하지 말고, 보이는 글자 그대로 출력해.
+줄바꿈과 띄어쓰기를 유지해.
+다른 설명은 절대 하지 마.
+        `,
+      },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "이 이미지 안의 모든 글자를 그대로 추출해줘." }, // ✅ 이 한 줄이 핵심!
+          { type: "image_url", image_url: `data:image/png;base64,${base64Image}` },
         ],
-      });
+      },
+    ],
+  });
 
-      extractedText = ocrResponse.choices[0]?.message?.content?.trim() || "";
-      console.log("🧾 OCR 인식 결과:", extractedText || "(없음)");
+  extractedText = ocrResponse.choices[0]?.message?.content?.trim() || "";
+  console.log("🧾 OCR 인식 결과:", extractedText || "(없음)");
 
-      if (!extractedText) {
-        return NextResponse.json(
-          { error: "⚠️ 이미지에서 텍스트를 인식하지 못했습니다. 이미지 내용을 다시 확인해주세요." },
-          { status: 400 }
-        );
-      }
-    } else {
-      console.log("⚠️ 이미지가 서버로 전달되지 않았습니다.");
-    }
+  if (!extractedText) {
+    return NextResponse.json(
+      { error: "⚠️ 이미지에서 텍스트를 인식하지 못했습니다. 텍스트가 있는 이미지인지 확인하세요." },
+      { status: 400 }
+    );
+  }
+}
+
 
     // ✅ 카테고리별 systemPrompt
     let systemPrompt = "";
