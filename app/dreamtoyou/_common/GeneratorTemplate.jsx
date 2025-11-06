@@ -1,16 +1,44 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-export default function GeneratorTemplate({ selectedCategory, promptHandler, referenceText, title, images, countChars }) {
+export default function GeneratorTemplate({
+  selectedCategory,
+  promptHandler,
+  referenceText,
+  title,
+  images,
+  countChars,
+}) {
   const [loading, setLoading] = useState(false);
   const [ocrStatus, setOcrStatus] = useState("");
   const [result, setResult] = useState("");
   const [generatedTitle, setGeneratedTitle] = useState("");
   const [charCount, setCharCount] = useState(0);
+  const [localTitle, setLocalTitle] = useState(title || "");
+  const [localImages, setLocalImages] = useState(images || []);
+
+  // ✅ 캡처 붙여넣기 감지 기능
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          setLocalImages([{ file }]);
+          alert("📸 이미지가 붙여넣기로 업로드되었습니다!");
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
 
   // ✅ 글 생성
   const handleGenerate = async () => {
-    if (!title.trim()) {
+    if (!localTitle.trim()) {
       alert("제목을 입력해주세요!");
       return;
     }
@@ -20,27 +48,26 @@ export default function GeneratorTemplate({ selectedCategory, promptHandler, ref
     setGeneratedTitle("");
     setOcrStatus("준비 중...");
 
-    const dynamicTitlePrompt = title.includes("*****")
+    const dynamicTitlePrompt = localTitle.includes("*****")
       ? "제목의 ***** 부분을 문맥에 맞는 자연스러운 문장으로 완성해줘."
       : "";
 
     const prompt = `
 ${promptHandler}
 
-제목: ${title}
+제목: ${localTitle}
 참고사항: ${referenceText}
 ${dynamicTitlePrompt}
 `;
 
-    // ✅ FormData 생성
     const formData = new FormData();
     formData.append("prompt", prompt);
     formData.append("referenceText", referenceText);
-    formData.append("title", title);
+    formData.append("title", localTitle);
     formData.append("category", selectedCategory || "정보성");
 
-    if (images.length > 0) {
-      const file = images[0].file || images[0];
+    if (localImages.length > 0) {
+      const file = localImages[0].file || localImages[0];
       formData.append("image", file, "reference.png");
       console.log("🖼️ 이미지 전송 준비 완료:", file.name, file.type, file.size, "bytes");
       setOcrStatus("🧠 이미지 텍스트 인식 중...");
@@ -76,7 +103,7 @@ ${dynamicTitlePrompt}
       const content = data.result.trim();
       const [maybeTitle, ...rest] = content.split("\n");
       const cleanTitle =
-        maybeTitle.length < 80 ? maybeTitle : title.replace("*****", "");
+        maybeTitle.length < 80 ? maybeTitle : localTitle.replace("*****", "");
       const body = rest.join("\n").trim();
 
       setGeneratedTitle(cleanTitle);
@@ -93,11 +120,43 @@ ${dynamicTitlePrompt}
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-lg mx-auto">
+      <h1 className="text-2xl font-semibold text-center text-indigo-700 mb-6">
+        🧠 드림투유 블로그 글 생성기
+      </h1>
+
+      {/* ✅ 제목 입력칸 */}
+      <input
+        type="text"
+        placeholder="제목을 입력하세요"
+        value={localTitle}
+        onChange={(e) => setLocalTitle(e.target.value)}
+        className="w-full p-2 border rounded-md mb-3"
+      />
+
+      {/* ✅ 참고사항 입력 */}
+      <textarea
+        placeholder="참고사항 (텍스트 입력)"
+        defaultValue={referenceText}
+        className="w-full p-2 border rounded-md mb-3"
+      />
+
+      {/* ✅ 이미지 업로드 */}
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setLocalImages(Array.from(e.target.files))}
+        className="w-full border p-2 rounded-md mb-4"
+      />
+      <p className="text-sm text-gray-500 mb-4">
+        ✨ 캡처 후 Ctrl+V로 붙여넣기 가능
+      </p>
+
+      {/* ✅ 글 생성 버튼 */}
       <button
         onClick={handleGenerate}
         disabled={loading}
-        className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+        className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
       >
         {loading ? "생성 중..." : "글 생성하기"}
       </button>
