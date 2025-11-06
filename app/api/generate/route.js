@@ -2,37 +2,42 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // 환경 변수는 그대로 사용
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(req) {
   try {
-    // ✅ 프론트에서 전달된 프롬프트 받기
     const { prompt } = await req.json();
 
-    // ✅ OpenAI 호출 (프롬프트 그대로 전달)
+    // 🚨 핵심: 절대 prompt 변형 금지
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini-2024-07-18",
       messages: [
         {
           role: "system",
-          content: "너는 사용자가 보낸 프롬프트를 그대로 충실히 따르는 AI야. 절대 변형하지 말고 그대로 반영해.",
+          content: `
+너는 사용자가 제공한 프롬프트의 지시만을 따라야 하는 AI야.
+사용자가 제공한 참고사항 외의 내용을 절대 추가하지 말고,
+참고사항의 내용만 근거로 글을 작성해야 해.
+'추가 설명', '자체 요약', '서론/결론 보강' 같은 것도 절대 하지 마.
+참고사항의 문체와 논리 구조를 유지해서 결과를 출력해.
+          `,
         },
         {
           role: "user",
-          content: prompt, // 프론트의 프롬프트 전체 그대로 전달
+          content: prompt,
         },
       ],
-      temperature: 0.8,
-      max_tokens: 2000,
+      temperature: 0.3, // ✅ 창의성 최소화
+      max_tokens: 1500,
     });
 
     const result = completion.choices[0].message.content;
     return NextResponse.json({ result });
   } catch (error) {
-    console.error("🔥 글 생성 중 오류:", error);
+    console.error("🔥 API 오류:", error);
     return NextResponse.json(
-      { error: "글 생성 중 오류가 발생했습니다.", details: error.message },
+      { error: "글 생성 중 오류 발생", details: error.message },
       { status: 500 }
     );
   }
