@@ -1,3 +1,4 @@
+"use client";
 import { useState } from "react";
 
 export default function GeneratorTemplate({ selectedCategory, promptHandler, referenceText, title, images, countChars }) {
