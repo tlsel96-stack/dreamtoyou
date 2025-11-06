@@ -33,7 +33,7 @@ export default function DreamToYouMain() {
       </div>
 
       <footer className="mt-10 text-gray-400 text-sm">
-        © 2025 DreamToYou | 블로그 콘텐츠 자동화 시스템
+        © 드림투유DA | 블로그 콘텐츠 자동화 시스템
       </footer>
     </main>
   );
